@@ -27,7 +27,7 @@ jobs:
     #   - https://gh.io/supported-runners-and-hardware-resources
     #   - https://gh.io/using-larger-runners (GitHub.com only)
     # Consider using larger runners or machines with greater resources for possible analysis time improvements.
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    runs-on: windows-latest
     permissions:
       # required for all workflows
       security-events: write
@@ -44,7 +44,11 @@ jobs:
       matrix:
         include:
         - language: c-cpp
-          build-mode: autobuild
+          build_mode: manual
+          build_configuration: Release
+          build_platform: Win32
+    env:
+      SOLUTION_FILE_PATH: srchybrid\emule.sln
         # CodeQL supports the following values keywords for 'language': 'actions', 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'rust', 'swift'
         # Use `c-cpp` to analyze code written in C, C++ or both
         # Use 'java-kotlin' to analyze code written in Java, Kotlin or both
@@ -56,6 +60,9 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
 
     # Add any setup steps before running the `github/codeql-action/init` action.
     # This includes steps like installing compilers or runtimes (`actions/setup-node`
@@ -68,7 +75,7 @@ jobs:
       uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
-        build-mode: ${{ matrix.build-mode }}
+        build-mode: ${{ matrix.build_mode }}
         # If you wish to specify custom queries, you can do so here or in a config file.
         # By default, queries listed here will override any specified in a config file.
         # Prefix the list here with "+" to use these queries and those in the config file.
@@ -76,22 +83,50 @@ jobs:
         # For more details on CodeQL's query packs, refer to: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
         # queries: security-extended,security-and-quality
 
-    # If the analyze step fails for one of the languages you are analyzing with
-    # "We were unable to automatically build your code", modify the matrix above
-    # to set the build mode to "manual" for that language. Then modify this step
-    # to build your code.
-    # ℹ️ Command-line programs to run using the OS shell.
-    # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
-    - name: Run manual build steps
-      if: matrix.build-mode == 'manual'
-      shell: bash
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x64
+
+    - name: Install MFC and ATL support
+      shell: pwsh
       run: |
-        echo 'If you are using a "manual" build mode for one or more of the' \
-          'languages you are analyzing, replace this with the commands to build' \
-          'your code, for example:'
-        echo '  make bootstrap'
-        echo '  make release'
-        exit 1
+        Write-Host "Checking for Visual Studio installation..."
+        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        Write-Host "Visual Studio path: $vsPath"
+
+        if (-not $vsPath) {
+          Write-Error "Visual Studio not found"
+          exit 1
+        }
+
+        $mfcPath = Join-Path $vsPath "VC\Tools\MSVC"
+        if (Test-Path $mfcPath) {
+          $mfcDirs = Get-ChildItem -Path $mfcPath -Directory | Where-Object { Test-Path (Join-Path $_.FullName "atlmfc") }
+          if ($mfcDirs) {
+            Write-Host "MFC/ATL components already installed."
+            return
+          }
+        }
+
+        Write-Host "Installing required MFC/ATL components..."
+        & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
+          --installPath "$vsPath" `
+          --add Microsoft.VisualStudio.Component.VC.ATL `
+          --add Microsoft.VisualStudio.Component.VC.ATLMFC `
+          --add Microsoft.VisualStudio.Component.VC.MFC `
+          --quiet --norestart | Out-Host
+        Write-Host "Component installation requested."
+
+    - name: Restore NuGet packages
+      shell: pwsh
+      run: nuget restore "${{ env.SOLUTION_FILE_PATH }}" -Verbosity normal
+
+    - name: Run manual build steps
+      if: matrix.build_mode == 'manual'
+      shell: pwsh
+      run: |
+        msbuild "${{ env.SOLUTION_FILE_PATH }}" /m /p:Configuration=${{ matrix.build_configuration }} /p:Platform=${{ matrix.build_platform }} /verbosity:normal /consoleloggerparameters:ErrorsOnly
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4

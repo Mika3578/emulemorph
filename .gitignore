@@ -1,6 +1,70 @@
-**/.vs/*
-**/*Debug*/*
-**/*Release*/*
-srchybrid/build/*
+# Visual Studio local settings
+.vs/
+**/.vs/
+*.suo
 *.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+
+# IDE caches and backups
+*.ipch
+*.ncb
+*.opendb
+*.cache
+*.bak
+
+# Build output directories
+[Bb]in/
+[Oo]bj/
+[Bb]uild/
+**/[Dd]ebug/
+**/[Rr]elease/
+**/x64/
+**/x86/
+srchybrid/build/
+
+# Generated build artifacts
+*.obj
+*.pch
+*.pdb
+*.idb
+*.ilk
+*.tlh
+*.tli
+*.tmp
+*.log
+*.tlog
+*.cachefile
+*.lastbuildstate
+*.bsc
+
+# Generated libraries and executables
+*.lib
+*.exp
+*.exe
+*.dll
+*.appx
+*.msix
+*.msm
+*.msp
+
+# Installer and package outputs
+*.msi
+*.cab
+*.nupkg
+
+# Crash dumps and reports
+*.dmp
+*.mdmp
+*.rpt
+
+# Legacy eMule artifacts
 IUpnp*.txt
+
+# Local tooling
+.cursor/
+
+# Documentation workspace
+wiki/
