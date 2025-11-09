@@ -1,24 +1,24 @@
 [submodule "cryptopp"]
-	path = cryptopp
-	url = https://github.com/Stullemon/cryptopp.git
-	branch = lastrelease
+path = cryptopp
+url = https://github.com/weidai11/cryptopp.git
+branch = master
 [submodule "zlib"]
-	path = zlib
-	url = https://github.com/Stullemon/zlib.git
-	branch = emule
+path = zlib
+url = https://github.com/madler/zlib.git
+branch = master
 [submodule "png"]
-	path = png
-	url = https://github.com/Stullemon/libpng.git
-	branch = emule
+path = png
+url = https://github.com/glennrp/libpng.git
+branch = libpng16
 [submodule "id3lib"]
-	path = id3lib
-	url = https://github.com/Stullemon/id3lib-devel.git
-	branch = emule
+    path = id3lib
+    url = https://git.code.sf.net/p/id3lib/code
+    branch = master
 [submodule "pupnp"]
-	path = pupnp
-	url = https://github.com/Stullemon/pupnp.git
-	branch = emule
+path = pupnp
+url = https://github.com/pupnp/pupnp.git
+branch = master
 [submodule "pthreads"]
-	path = pthreads
-	url = https://github.com/Stullemon/pthreads4w.git
-	branch = emule
+path = pthreads
+url = https://github.com/jwinarske/pthreads4w.git
+branch = master
