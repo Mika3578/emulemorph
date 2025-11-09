@@ -48,23 +48,21 @@ jobs:
           exit 1
         }
 
-        $mfcPath = Join-Path $vsPath "VC\Tools\MSVC"
-        if (Test-Path $mfcPath) {
-          $mfcDirs = Get-ChildItem -Path $mfcPath -Directory | Where-Object { Test-Path (Join-Path $_.FullName "atlmfc") }
-          if ($mfcDirs) {
-            Write-Host "MFC/ATL components already installed."
-            return
-          }
-        }
-
         Write-Host "Installing required MFC/ATL components..."
-        & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
-          --installPath "$vsPath" `
-          --add Microsoft.VisualStudio.Component.VC.ATL `
-          --add Microsoft.VisualStudio.Component.VC.ATLMFC `
-          --add Microsoft.VisualStudio.Component.VC.MFC `
-          --quiet --norestart | Out-Host
-        Write-Host "Component installation requested."
+        $process = Start-Process -FilePath "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" `
+          -ArgumentList "modify", "--installPath", $vsPath, `
+            "--add", "Microsoft.VisualStudio.Component.VC.ATL", `
+            "--add", "Microsoft.VisualStudio.Component.VC.ATLMFC", `
+            "--add", "Microsoft.VisualStudio.Component.VC.MFC", `
+            "--quiet", "--norestart" `
+          -Wait -PassThru -NoNewWindow
+        
+        if ($process.ExitCode -ne 0) {
+          Write-Warning "vs_installer returned exit code $($process.ExitCode). This may indicate components were already installed or no changes were needed."
+        }
+        
+        Write-Host "MFC/ATL component installation completed."
+
 
     - name: Restore NuGet packages
       shell: pwsh
