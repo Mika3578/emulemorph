@@ -12,8 +12,8 @@
 	branch = libpng16
 [submodule "id3lib"]
         path = id3lib
-        url = https://github.com/margus-allekand/id3lib.git
-        branch = master
+        url = https://github.com/cpp-port/id3lib.git
+        branch = main
 [submodule "pupnp"]
 	path = pupnp
 	url = https://github.com/pupnp/pupnp.git
