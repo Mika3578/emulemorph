@@ -36,49 +36,59 @@ jobs:
       with:
         msbuild-architecture: x64
 
-    - name: Install MFC support
+    - name: Install required Visual Studio components
       shell: pwsh
       run: |
         Write-Host "Checking for Visual Studio installation..."
-        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        if (-not (Test-Path $vswhere)) {
+          throw "vswhere.exe not found at $vswhere"
+        }
+
+        $vsPath = & $vswhere -latest -property installationPath
+        if (-not $vsPath) {
+          throw "Visual Studio installation path could not be determined."
+        }
+
         Write-Host "Visual Studio path: $vsPath"
 
-        if (-not $vsPath) {
-          Write-Error "Visual Studio not found"
-          exit 1
+        $vsInstaller = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+        if (-not (Test-Path $vsInstaller)) {
+          throw "Visual Studio installer not found at $vsInstaller"
         }
 
         $requiredComponents = @(
-          "Microsoft.VisualStudio.Component.VC.ATLMFC"
+          "Microsoft.VisualStudio.Workload.NativeDesktop",
+          "Microsoft.VisualStudio.Component.VC.ATLMFC",
+          "Microsoft.VisualStudio.Component.VC.ATL",
+          "Microsoft.VisualStudio.Component.VC.v142.x86.x64",
+          "Microsoft.VisualStudio.Component.VC.v142.ATL",
+          "Microsoft.VisualStudio.Component.VC.v142.MFC",
+          "Microsoft.VisualStudio.Component.Windows81SDK"
         )
 
-        $missingComponents = @()
+        Write-Host "Requesting installation of required Visual Studio components:"
+        $requiredComponents | ForEach-Object { Write-Host "  - $_" }
+
+        $arguments = @("modify", "--installPath", $vsPath)
         foreach ($component in $requiredComponents) {
-          $componentInstalled = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires $component -property installationPath 2>$null
-          if (-not $componentInstalled) {
-            $missingComponents += $component
-          }
-        }
-
-        if ($missingComponents.Count -eq 0) {
-          Write-Host "Required components are already installed."
-          return
-        }
-
-        Write-Host "Installing missing Visual Studio components: $($missingComponents -join ', ')"
-        $arguments = @("modify", "--installPath", $vsPath, "--quiet", "--norestart")
-        foreach ($component in $missingComponents) {
           $arguments += @("--add", $component)
         }
+        $arguments += @("--quiet", "--norestart")
 
-        $process = Start-Process -FilePath "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" `
-          -ArgumentList $arguments -Wait -PassThru -NoNewWindow
+        Write-Host "Invoking: $vsInstaller $($arguments -join ' ')"
+        & $vsInstaller $arguments
+        $exitCode = $LASTEXITCODE
 
-        if ($process.ExitCode -ne 0 -and $process.ExitCode -ne 3010) {
-          throw "vs_installer returned exit code $($process.ExitCode)."
+        switch ($exitCode) {
+          0      { Write-Host "Visual Studio component installation completed successfully." }
+          3010   { Write-Warning "Visual Studio components installed. A reboot is required but will be skipped on the hosted runner." }
+          1638   { Write-Host "Visual Studio component(s) already installed. No action needed." }
+          Default {
+            Write-Warning "vs_installer returned exit code $exitCode. See https://learn.microsoft.com/en-us/windows/win32/msi/error-codes for details."
+            throw "vs_installer returned unexpected exit code $exitCode."
+          }
         }
-
-        Write-Host "Visual Studio component installation completed."
 
 
     - name: Restore NuGet packages
