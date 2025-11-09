@@ -36,33 +36,55 @@ jobs:
       with:
         msbuild-architecture: x64
 
-    - name: Install MFC and ATL support
+    - name: Install required Visual Studio components
       shell: pwsh
       run: |
         Write-Host "Checking for Visual Studio installation..."
-        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        if (-not (Test-Path $vswhere)) {
+          throw "vswhere.exe not found at $vswhere"
+        }
+
+        $vsPath = & $vswhere -latest -property installationPath
+        if (-not $vsPath) {
+          throw "Visual Studio installation path could not be determined."
+        }
+
         Write-Host "Visual Studio path: $vsPath"
 
-        if (-not $vsPath) {
-          Write-Error "Visual Studio not found"
-          exit 1
+        $vsInstaller = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+        if (-not (Test-Path $vsInstaller)) {
+          throw "Visual Studio installer not found at $vsInstaller"
         }
 
-        Write-Host "Installing required MFC/ATL components and Windows SDK 8.1..."
-        $process = Start-Process -FilePath "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" `
-          -ArgumentList "modify", "--installPath", $vsPath, `
-            "--add", "Microsoft.VisualStudio.Component.VC.ATL", `
-            "--add", "Microsoft.VisualStudio.Component.VC.ATLMFC", `
-            "--add", "Microsoft.VisualStudio.Component.VC.MFC", `
-            "--add", "Microsoft.VisualStudio.Component.Windows81SDK", `
-            "--quiet", "--norestart" `
-          -Wait -PassThru -NoNewWindow
-        
-        if ($process.ExitCode -ne 0 -and $process.ExitCode -ne 3010) {
-          Write-Warning "vs_installer returned exit code $($process.ExitCode). This may indicate components were already installed or no changes were needed."
+        $requiredComponents = @(
+          "Microsoft.VisualStudio.Workload.NativeDesktop",
+          "Microsoft.VisualStudio.Component.VC.ATLMFC",
+          "Microsoft.VisualStudio.Component.VC.ATL",
+          "Microsoft.VisualStudio.Component.VC.v141.x86.x64",
+          "Microsoft.VisualStudio.Component.VC.v141.ATL",
+          "Microsoft.VisualStudio.Component.VC.v141.MFC",
+          "Microsoft.VisualStudio.Component.Windows81SDK"
+        )
+
+        Write-Host "Requesting installation of required Visual Studio components:"
+        $requiredComponents | ForEach-Object { Write-Host "  - $_" }
+
+        $arguments = @("modify", "--installPath", $vsPath)
+        foreach ($component in $requiredComponents) {
+          $arguments += @("--add", $component)
         }
-        
-        Write-Host "MFC/ATL components and Windows SDK 8.1 installation completed."
+        $arguments += @("--quiet", "--norestart")
+
+        Write-Host "Invoking: $vsInstaller $($arguments -join ' ')"
+        & $vsInstaller $arguments
+        $exitCode = $LASTEXITCODE
+
+        switch ($exitCode) {
+          0      { Write-Host "Visual Studio component installation completed successfully." }
+          3010   { Write-Warning "Visual Studio components installed. A reboot is required but will be skipped on the hosted runner." }
+          Default { throw "vs_installer returned exit code $exitCode." }
+        }
 
 
     - name: Restore NuGet packages
@@ -71,7 +93,7 @@ jobs:
 
     - name: Build solution
       shell: pwsh
-      run: msbuild "${{ env.SOLUTION_FILE_PATH }}" /m /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ env.BUILD_PLATFORM }} /verbosity:normal /consoleloggerparameters:ErrorsOnly
+      run: msbuild "${{ env.SOLUTION_FILE_PATH }}" /m /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ env.BUILD_PLATFORM }} /p:WindowsTargetPlatformVersion=10.0 /verbosity:normal /consoleloggerparameters:ErrorsOnly
 
     - name: Upload executable
       if: matrix.configuration == 'Release'
