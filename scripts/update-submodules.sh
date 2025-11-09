@@ -55,7 +55,7 @@ fi
 
 cd "$git_root"
 
-# Ensure every submodule is at least initialised locally.
+# Ensure every submodule is at least initialized locally.
 git submodule update --init --recursive
 
 # Iterate over every submodule (recursively) and update it.
