@@ -48,20 +48,21 @@ jobs:
           exit 1
         }
 
-        Write-Host "Installing required MFC/ATL components..."
+        Write-Host "Installing required MFC/ATL components and Windows SDK 8.1..."
         $process = Start-Process -FilePath "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" `
           -ArgumentList "modify", "--installPath", $vsPath, `
             "--add", "Microsoft.VisualStudio.Component.VC.ATL", `
             "--add", "Microsoft.VisualStudio.Component.VC.ATLMFC", `
             "--add", "Microsoft.VisualStudio.Component.VC.MFC", `
+            "--add", "Microsoft.VisualStudio.Component.Windows81SDK", `
             "--quiet", "--norestart" `
           -Wait -PassThru -NoNewWindow
         
-        if ($process.ExitCode -ne 0) {
+        if ($process.ExitCode -ne 0 -and $process.ExitCode -ne 3010) {
           Write-Warning "vs_installer returned exit code $($process.ExitCode). This may indicate components were already installed or no changes were needed."
         }
         
-        Write-Host "MFC/ATL component installation completed."
+        Write-Host "MFC/ATL components and Windows SDK 8.1 installation completed."
 
 
     - name: Restore NuGet packages

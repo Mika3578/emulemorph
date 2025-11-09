@@ -431,7 +431,6 @@
     <ClCompile Include="ptw32_rwlock_check_need_init.c" />
     <ClCompile Include="ptw32_semwait.c" />
     <ClCompile Include="ptw32_spinlock_check_need_init.c" />
-    <ClCompile Include="ptw32_strdup.c" />
     <ClCompile Include="ptw32_threadDestroy.c" />
     <ClCompile Include="ptw32_threadStart.c" />
     <ClCompile Include="ptw32_throw.c" />
