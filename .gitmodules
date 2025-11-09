@@ -1,24 +1,24 @@
 [submodule "cryptopp"]
-path = cryptopp
-url = https://github.com/weidai11/cryptopp.git
-branch = master
+	path = cryptopp
+	url = https://github.com/weidai11/cryptopp.git
+	branch = master
 [submodule "zlib"]
-path = zlib
-url = https://github.com/madler/zlib.git
-branch = master
+	path = zlib
+	url = https://github.com/madler/zlib.git
+	branch = master
 [submodule "png"]
-path = png
-url = https://github.com/glennrp/libpng.git
-branch = libpng16
+	path = png
+	url = https://github.com/glennrp/libpng.git
+	branch = libpng16
 [submodule "id3lib"]
-    path = id3lib
-    url = https://git.code.sf.net/p/id3lib/code
-    branch = master
+	path = id3lib
+	url = https://git.code.sf.net/p/id3lib/code
+	branch = master
 [submodule "pupnp"]
-path = pupnp
-url = https://github.com/pupnp/pupnp.git
-branch = master
+	path = pupnp
+	url = https://github.com/pupnp/pupnp.git
+	branch = master
 [submodule "pthreads"]
-path = pthreads
-url = https://github.com/jwinarske/pthreads4w.git
-branch = master
+	path = pthreads
+	url = https://github.com/jwinarske/pthreads4w.git
+	branch = master
