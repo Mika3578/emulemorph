@@ -61,9 +61,9 @@ jobs:
           "Microsoft.VisualStudio.Workload.NativeDesktop",
           "Microsoft.VisualStudio.Component.VC.ATLMFC",
           "Microsoft.VisualStudio.Component.VC.ATL",
-          "Microsoft.VisualStudio.Component.VC.v141.x86.x64",
-          "Microsoft.VisualStudio.Component.VC.v141.ATL",
-          "Microsoft.VisualStudio.Component.VC.v141.MFC",
+          "Microsoft.VisualStudio.Component.VC.v142.x86.x64",
+          "Microsoft.VisualStudio.Component.VC.v142.ATL",
+          "Microsoft.VisualStudio.Component.VC.v142.MFC",
           "Microsoft.VisualStudio.Component.Windows81SDK"
         )
 
