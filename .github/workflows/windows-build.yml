@@ -9,70 +9,54 @@ on:
 
 jobs:
   build:
+    name: Build ${{ matrix.configuration }} ${{ matrix.platform }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        configuration: [ Release, Debug ]
+        include:
+          - configuration: Debug
+            platform: Win32
+          - configuration: Release
+            platform: Win32
     env:
-      SOLUTION_FILE_PATH: srchybrid\emule.sln
+      SOLUTION_FILE_PATH: 'srchybrid\emule.sln'
       BUILD_PLATFORM: Win32
-      ARTIFACT_PATH: srchybrid\build\Win32\Binary\eMule.exe
+      ARTIFACT_PATH: 'srchybrid\build\Win32\Binary\eMule.exe'
+    defaults:
+      run:
+        shell: pwsh
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
 
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v2
-      with:
-        msbuild-architecture: x64
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v1
 
-    - name: Install MFC and ATL support
-      shell: pwsh
-      run: |
-        Write-Host "Checking for Visual Studio installation..."
-        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
-        Write-Host "Visual Studio path: $vsPath"
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
 
-        if (-not $vsPath) {
-          Write-Error "Visual Studio not found"
-          exit 1
-        }
+      - name: Restore NuGet packages
+        run: nuget restore "${{ env.SOLUTION_FILE_PATH }}" -Verbosity normal
 
-        $mfcPath = Join-Path $vsPath "VC\Tools\MSVC"
-        if (Test-Path $mfcPath) {
-          $mfcDirs = Get-ChildItem -Path $mfcPath -Directory | Where-Object { Test-Path (Join-Path $_.FullName "atlmfc") }
-          if ($mfcDirs) {
-            Write-Host "MFC/ATL components already installed."
-            return
-          }
-        }
+      - name: Build solution
+        run: >
+          msbuild "${{ env.SOLUTION_FILE_PATH }}"
+          /m
+          /p:Configuration=${{ matrix.configuration }}
+          /p:Platform=${{ env.BUILD_PLATFORM }}
+          /verbosity:minimal
 
-        Write-Host "Installing required MFC/ATL components..."
-        & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
-          --installPath "$vsPath" `
-          --add Microsoft.VisualStudio.Component.VC.ATL `
-          --add Microsoft.VisualStudio.Component.VC.ATLMFC `
-          --add Microsoft.VisualStudio.Component.VC.MFC `
-          --quiet --norestart | Out-Host
-        Write-Host "Component installation requested."
-
-    - name: Restore NuGet packages
-      shell: pwsh
-      run: nuget restore "${{ env.SOLUTION_FILE_PATH }}" -Verbosity normal
-
-    - name: Build solution
-      shell: pwsh
-      run: msbuild "${{ env.SOLUTION_FILE_PATH }}" /m /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ env.BUILD_PLATFORM }} /verbosity:normal /consoleloggerparameters:ErrorsOnly
-
-    - name: Upload executable
-      if: matrix.configuration == 'Release'
-      uses: actions/upload-artifact@v4
-      with:
-        name: emule-${{ matrix.configuration }}-${{ env.BUILD_PLATFORM }}
-        path: ${{ env.ARTIFACT_PATH }}
-        if-no-files-found: error
+      - name: Upload executable
+        if: matrix.configuration == 'Release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: emule-${{ matrix.configuration }}-${{ env.BUILD_PLATFORM }}
+          path: ${{ env.ARTIFACT_PATH }}
+          if-no-files-found: error
 
