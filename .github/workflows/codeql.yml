@@ -66,6 +66,10 @@ jobs:
     - name: Update submodules
       run: git submodule update --init --recursive
 
+    - name: Copy pthread.vcxproj to pthreads submodule
+      shell: pwsh
+      run: Copy-Item -Path "build-support\pthread.vcxproj" -Destination "pthreads\pthread.vcxproj" -Force
+
     # Add any setup steps before running the `github/codeql-action/init` action.
     # This includes steps like installing compilers or runtimes (`actions/setup-node`
     # or others). This is typically only required for manual builds.

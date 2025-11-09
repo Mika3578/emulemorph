@@ -27,6 +27,10 @@ jobs:
     - name: Update submodules
       run: git submodule update --init --recursive
 
+    - name: Copy pthread.vcxproj to pthreads submodule
+      shell: pwsh
+      run: Copy-Item -Path "build-support\pthread.vcxproj" -Destination "pthreads\pthread.vcxproj" -Force
+
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
       with:
