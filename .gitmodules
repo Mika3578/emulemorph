@@ -20,5 +20,5 @@
 	branch = master
 [submodule "pthreads"]
 	path = pthreads
-	url = https://github.com/jwinarske/pthreads4w.git
+	url = https://github.com/GerHobbelt/pthread-win32.git
 	branch = master

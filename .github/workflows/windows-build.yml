@@ -25,40 +25,60 @@ jobs:
         submodules: recursive
         fetch-depth: 0
 
-    - name: Add MSBuild to PATH
+    - name: Setup Visual Studio with MFC and ATL
       uses: microsoft/setup-msbuild@v2
       with:
         msbuild-architecture: x64
+        vs-version: '[16.0,18.0)'
 
-    - name: Install MFC and ATL support
+    - name: Install Visual Studio Components
       shell: pwsh
       run: |
-        Write-Host "Checking for Visual Studio installation..."
-        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        Write-Host "Installing Visual Studio MFC and ATL components..."
+        
+        # Get Visual Studio installation path
+        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+          -latest -property installationPath
+        
         Write-Host "Visual Studio path: $vsPath"
-
+        
         if (-not $vsPath) {
-          Write-Error "Visual Studio not found"
+          Write-Error "Visual Studio installation not found"
           exit 1
         }
-
+        
+        # Check if MFC/ATL is already installed
         $mfcPath = Join-Path $vsPath "VC\Tools\MSVC"
+        $mfcInstalled = $false
+        
         if (Test-Path $mfcPath) {
-          $mfcDirs = Get-ChildItem -Path $mfcPath -Directory | Where-Object { Test-Path (Join-Path $_.FullName "atlmfc") }
+          $mfcDirs = Get-ChildItem -Path $mfcPath -Directory -ErrorAction SilentlyContinue | 
+            Where-Object { Test-Path (Join-Path $_.FullName "atlmfc\include\atlbase.h") }
           if ($mfcDirs) {
-            Write-Host "MFC/ATL components already installed."
-            return
+            Write-Host "MFC/ATL components already installed"
+            $mfcInstalled = $true
           }
         }
-
-        Write-Host "Installing required MFC/ATL components..."
-        & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
-          --installPath "$vsPath" `
-          --add Microsoft.VisualStudio.Component.VC.ATL `
-          --add Microsoft.VisualStudio.Component.VC.ATLMFC `
-          --add Microsoft.VisualStudio.Component.VC.MFC `
-          --quiet --norestart | Out-Host
-        Write-Host "Component installation requested."
+        
+        if (-not $mfcInstalled) {
+          Write-Host "Installing MFC and ATL components..."
+          
+          # Use vs_installer to add components
+          $installerPath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+          
+          & $installerPath modify `
+            --installPath $vsPath `
+            --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
+            --add Microsoft.VisualStudio.Component.Windows10SDK.19041 `
+            --quiet --norestart --wait
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Component installation returned exit code: $LASTEXITCODE"
+          } else {
+            Write-Host "Components installed successfully"
+          }
+        }
 
     - name: Restore NuGet packages
       shell: pwsh
