@@ -36,7 +36,7 @@ jobs:
       with:
         msbuild-architecture: x64
 
-    - name: Install MFC and ATL support
+    - name: Install MFC support
       shell: pwsh
       run: |
         Write-Host "Checking for Visual Studio installation..."
@@ -48,21 +48,37 @@ jobs:
           exit 1
         }
 
-        Write-Host "Installing required MFC/ATL components and Windows SDK 8.1..."
-        $process = Start-Process -FilePath "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" `
-          -ArgumentList "modify", "--installPath", $vsPath, `
-            "--add", "Microsoft.VisualStudio.Component.VC.ATL", `
-            "--add", "Microsoft.VisualStudio.Component.VC.ATLMFC", `
-            "--add", "Microsoft.VisualStudio.Component.VC.MFC", `
-            "--add", "Microsoft.VisualStudio.Component.Windows81SDK", `
-            "--quiet", "--norestart" `
-          -Wait -PassThru -NoNewWindow
-        
-        if ($process.ExitCode -ne 0 -and $process.ExitCode -ne 3010) {
-          Write-Warning "vs_installer returned exit code $($process.ExitCode). This may indicate components were already installed or no changes were needed."
+        $requiredComponents = @(
+          "Microsoft.VisualStudio.Component.VC.ATLMFC"
+        )
+
+        $missingComponents = @()
+        foreach ($component in $requiredComponents) {
+          $componentInstalled = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires $component -property installationPath 2>$null
+          if (-not $componentInstalled) {
+            $missingComponents += $component
+          }
         }
-        
-        Write-Host "MFC/ATL components and Windows SDK 8.1 installation completed."
+
+        if ($missingComponents.Count -eq 0) {
+          Write-Host "Required components are already installed."
+          return
+        }
+
+        Write-Host "Installing missing Visual Studio components: $($missingComponents -join ', ')"
+        $arguments = @("modify", "--installPath", $vsPath, "--quiet", "--norestart")
+        foreach ($component in $missingComponents) {
+          $arguments += @("--add", $component)
+        }
+
+        $process = Start-Process -FilePath "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" `
+          -ArgumentList $arguments -Wait -PassThru -NoNewWindow
+
+        if ($process.ExitCode -ne 0 -and $process.ExitCode -ne 3010) {
+          throw "vs_installer returned exit code $($process.ExitCode)."
+        }
+
+        Write-Host "Visual Studio component installation completed."
 
 
     - name: Restore NuGet packages
@@ -71,7 +87,7 @@ jobs:
 
     - name: Build solution
       shell: pwsh
-      run: msbuild "${{ env.SOLUTION_FILE_PATH }}" /m /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ env.BUILD_PLATFORM }} /verbosity:normal /consoleloggerparameters:ErrorsOnly
+      run: msbuild "${{ env.SOLUTION_FILE_PATH }}" /m /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ env.BUILD_PLATFORM }} /p:WindowsTargetPlatformVersion=10.0 /verbosity:normal /consoleloggerparameters:ErrorsOnly
 
     - name: Upload executable
       if: matrix.configuration == 'Release'
