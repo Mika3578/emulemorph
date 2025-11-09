@@ -83,7 +83,11 @@ jobs:
         switch ($exitCode) {
           0      { Write-Host "Visual Studio component installation completed successfully." }
           3010   { Write-Warning "Visual Studio components installed. A reboot is required but will be skipped on the hosted runner." }
-          Default { throw "vs_installer returned exit code $exitCode." }
+          1638   { Write-Host "Visual Studio component(s) already installed. No action needed." }
+          Default {
+            Write-Warning "vs_installer returned exit code $exitCode. See https://learn.microsoft.com/en-us/windows/win32/msi/error-codes for details."
+            throw "vs_installer returned unexpected exit code $exitCode."
+          }
         }
 
 
