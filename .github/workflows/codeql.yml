@@ -61,8 +61,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        submodules: recursive
         fetch-depth: 0
+
+    - name: Update submodules
+      run: git submodule update --init --recursive
 
     # Add any setup steps before running the `github/codeql-action/init` action.
     # This includes steps like installing compilers or runtimes (`actions/setup-node`
