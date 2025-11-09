@@ -11,9 +11,9 @@
 	url = https://github.com/glennrp/libpng.git
 	branch = libpng16
 [submodule "id3lib"]
-	path = id3lib
-	url = https://git.code.sf.net/p/id3lib/code
-	branch = master
+        path = id3lib
+        url = https://github.com/margus-allekand/id3lib.git
+        branch = master
 [submodule "pupnp"]
 	path = pupnp
 	url = https://github.com/pupnp/pupnp.git
