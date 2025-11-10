@@ -4,3 +4,7 @@
 srchybrid/build/*
 *.user
 IUpnp*.txt
+
+# GitHub Actions artifacts
+*.sarif
+trivy-results.sarif

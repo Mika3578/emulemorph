@@ -1,0 +1,65 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Release, Debug]
+        platform: [Win32]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x86
+    
+    - name: Setup Visual Studio Developer Environment
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+    
+    - name: Restore NuGet packages
+      working-directory: ${{github.workspace}}/srchybrid
+      run: nuget restore emule.sln
+    
+    - name: Build Solution
+      working-directory: ${{github.workspace}}/srchybrid
+      run: msbuild /m /p:Configuration=${{matrix.configuration}} /p:Platform=${{matrix.platform}} emule.sln
+    
+    - name: Upload Build Artifacts
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v4
+      with:
+        name: emule-${{matrix.platform}}-${{matrix.configuration}}
+        path: |
+          srchybrid/${{matrix.configuration}}/*.exe
+          srchybrid/${{matrix.configuration}}/*.dll
+          srchybrid/${{matrix.configuration}}/*.pdb
+        retention-days: 30
+    
+    - name: Build Summary
+      if: always()
+      run: |
+        echo "### Build Complete :rocket:" >> $env:GITHUB_STEP_SUMMARY
+        echo "Configuration: ${{matrix.configuration}}" >> $env:GITHUB_STEP_SUMMARY
+        echo "Platform: ${{matrix.platform}}" >> $env:GITHUB_STEP_SUMMARY
+        if (Test-Path "srchybrid/${{matrix.configuration}}/emule.exe") {
+          $fileInfo = Get-Item "srchybrid/${{matrix.configuration}}/emule.exe"
+          echo "Executable Size: $($fileInfo.Length / 1MB) MB" >> $env:GITHUB_STEP_SUMMARY
+        }

@@ -1,0 +1,69 @@
+name: "CodeQL Security Scan"
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly on Mondays
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze C++ Code
+    runs-on: windows-latest
+    timeout-minutes: 360
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp' ]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: +security-extended,security-and-quality
+        config: |
+          paths-ignore:
+            - '**/test/**'
+            - '**/tests/**'
+            - '**/build/**'
+            - '**/Debug/**'
+            - '**/Release/**'
+    
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x86
+    
+    - name: Setup Visual Studio Developer Environment
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+    
+    - name: Restore NuGet packages
+      working-directory: ${{github.workspace}}/srchybrid
+      run: nuget restore emule.sln
+    
+    - name: Build for CodeQL Analysis
+      working-directory: ${{github.workspace}}/srchybrid
+      run: msbuild /m /p:Configuration=Release /p:Platform=Win32 emule.sln
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+        upload: true
