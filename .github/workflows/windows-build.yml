@@ -41,6 +41,36 @@ jobs:
         with:
           msbuild-architecture: x64
 
+      - name: Install MFC and ATL support
+        shell: pwsh
+        run: |
+          Write-Host "Checking for Visual Studio installation..."
+          $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          Write-Host "Visual Studio path: $vsPath"
+
+          if (-not $vsPath) {
+            Write-Error "Visual Studio not found"
+            exit 1
+          }
+
+          $mfcPath = Join-Path $vsPath "VC\Tools\MSVC"
+          if (Test-Path $mfcPath) {
+            $mfcDirs = Get-ChildItem -Path $mfcPath -Directory | Where-Object { Test-Path (Join-Path $_.FullName "atlmfc") }
+            if ($mfcDirs) {
+              Write-Host "MFC/ATL components already installed."
+              return
+            }
+          }
+
+          Write-Host "Installing required MFC/ATL components..."
+          & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
+            --installPath "$vsPath" `
+            --add Microsoft.VisualStudio.Component.VC.ATL `
+            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
+            --add Microsoft.VisualStudio.Component.VC.MFC `
+            --quiet --norestart | Out-Host
+          Write-Host "Component installation requested."
+
       - name: Restore NuGet packages
         run: nuget restore "${{ env.SOLUTION_FILE_PATH }}" -Verbosity normal
 
