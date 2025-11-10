@@ -36,14 +36,16 @@ jobs:
     - name: Install Visual Studio MFC/ATL Components
       shell: pwsh
       run: |
-        # Visual Studio already includes MFC/ATL in windows-latest runner
+        # Install MFC and ATL components required for building eMule
+        Write-Host "Installing Visual Studio MFC and ATL components..."
+        choco install visualstudio2022-workload-vctools --package-parameters "--add Microsoft.VisualStudio.Component.VC.ATL --add Microsoft.VisualStudio.Component.VC.ATLMFC" -y
+        
         # Verify installation
         $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
         Write-Host "Visual Studio Path: $vsPath"
-        Write-Host "Checking MFC/ATL availability..."
         if (Test-Path "$vsPath\VC\Tools\MSVC") {
           $mfcPath = Get-ChildItem "$vsPath\VC\Tools\MSVC" -Directory | Select-Object -Last 1
-          Write-Host "MFC/ATL Path: $mfcPath"
+          Write-Host "MFC/ATL installed at: $mfcPath"
         }
     
     - name: Setup Visual Studio Developer Environment
@@ -79,5 +81,5 @@ jobs:
         echo "Platform: ${{matrix.platform}}" >> $env:GITHUB_STEP_SUMMARY
         if (Test-Path "srchybrid/${{matrix.configuration}}/emule.exe") {
           $fileInfo = Get-Item "srchybrid/${{matrix.configuration}}/emule.exe"
-          echo "Executable Size: $($fileInfo.Length / 1MB) MB" >> $env:GITHUB_STEP_SUMMARY
+          echo "Executable Size: $([math]::Round($fileInfo.Length / 1MB, 2)) MB" >> $env:GITHUB_STEP_SUMMARY
         }

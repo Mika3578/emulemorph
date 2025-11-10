@@ -57,7 +57,7 @@ jobs:
         echo "### Code Quality Checks :mag:" >> $env:GITHUB_STEP_SUMMARY
         
         # Check for TODO comments
-        $todos = Select-String -Path srchybrid\*.cpp,srchybrid\*.h -Pattern "TODO|FIXME|HACK" -Recurse -ErrorAction SilentlyContinue
+        $todos = Select-String -Path srchybrid -Include *.cpp,*.h -Pattern "TODO|FIXME|HACK" -Recurse -ErrorAction SilentlyContinue
         if ($todos) {
           $todoCount = ($todos | Measure-Object).Count
           echo "Found $todoCount TODO/FIXME/HACK comments" >> $env:GITHUB_STEP_SUMMARY
@@ -66,7 +66,7 @@ jobs:
         }
         
         # Check for hardcoded paths
-        $hardcodedPaths = Select-String -Path srchybrid\*.cpp -Pattern "C:\\\\|D:\\\\" -Recurse -ErrorAction SilentlyContinue
+        $hardcodedPaths = Select-String -Path srchybrid -Include *.cpp -Pattern "C:\\\\|D:\\\\" -Recurse -ErrorAction SilentlyContinue
         if ($hardcodedPaths) {
           $pathCount = ($hardcodedPaths | Measure-Object).Count
           echo ":warning: Found $pathCount potential hardcoded paths" >> $env:GITHUB_STEP_SUMMARY
