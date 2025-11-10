@@ -21,15 +21,17 @@ jobs:
         submodules: recursive
         fetch-depth: 0
     
-    - name: Add MSBuild to PATH
+    - name: Setup Visual Studio with MFC/ATL
       uses: microsoft/setup-msbuild@v2
       with:
         msbuild-architecture: x86
+        vs-version: 'latest'
     
     - name: Setup Visual Studio Developer Environment
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x86
+        vsversion: 'latest'
     
     - name: Restore NuGet packages
       working-directory: ${{github.workspace}}/srchybrid
