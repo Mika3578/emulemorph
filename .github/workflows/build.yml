@@ -27,15 +27,30 @@ jobs:
         submodules: recursive
         fetch-depth: 0
     
-    - name: Add MSBuild to PATH
+    - name: Setup Visual Studio with MFC/ATL
       uses: microsoft/setup-msbuild@v2
       with:
         msbuild-architecture: x86
+        vs-version: 'latest'
+    
+    - name: Install Visual Studio MFC/ATL Components
+      shell: pwsh
+      run: |
+        # Visual Studio already includes MFC/ATL in windows-latest runner
+        # Verify installation
+        $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        Write-Host "Visual Studio Path: $vsPath"
+        Write-Host "Checking MFC/ATL availability..."
+        if (Test-Path "$vsPath\VC\Tools\MSVC") {
+          $mfcPath = Get-ChildItem "$vsPath\VC\Tools\MSVC" -Directory | Select-Object -Last 1
+          Write-Host "MFC/ATL Path: $mfcPath"
+        }
     
     - name: Setup Visual Studio Developer Environment
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x86
+        vsversion: 'latest'
     
     - name: Restore NuGet packages
       working-directory: ${{github.workspace}}/srchybrid
