@@ -36,12 +36,14 @@ jobs:
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
-    - name: Install ATL and MFC components
+    - name: Install MFC and ATL components
+      shell: pwsh
       run: |
         $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        Write-Host "Visual Studio installation path: $vsPath"
         $installerPath = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
-        & $installerPath modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATL --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart
-      shell: powershell
+        & $installerPath modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.MFC --add Microsoft.VisualStudio.Component.VC.ATL --quiet --norestart
+        Write-Host "MFC and ATL components installation completed"
 
     - name: Build with MSBuild
       run: msbuild srchybrid\emule.sln /p:Configuration=Release /p:Platform=Win32
