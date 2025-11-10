@@ -10,6 +10,9 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: write
     
     strategy:
       fail-fast: false
