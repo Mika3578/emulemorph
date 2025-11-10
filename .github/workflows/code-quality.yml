@@ -1,0 +1,96 @@
+name: "Code Quality Check"
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x86
+    
+    - name: Setup Visual Studio Developer Environment
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+    
+    - name: Restore NuGet packages
+      working-directory: ${{github.workspace}}/srchybrid
+      run: nuget restore emule.sln
+    
+    - name: Build with Code Analysis
+      working-directory: ${{github.workspace}}/srchybrid
+      run: |
+        msbuild /m /p:Configuration=Release /p:Platform=Win32 /p:RunCodeAnalysis=true /p:CodeAnalysisRuleSet=NativeRecommendedRules.ruleset emule.sln
+      continue-on-error: true
+    
+    - name: Count Source Files
+      run: |
+        echo "### Code Statistics :bar_chart:" >> $env:GITHUB_STEP_SUMMARY
+        $cppFiles = (Get-ChildItem -Path srchybrid -Recurse -Include *.cpp -File).Count
+        $hFiles = (Get-ChildItem -Path srchybrid -Recurse -Include *.h -File).Count
+        echo "C++ Source Files (.cpp): $cppFiles" >> $env:GITHUB_STEP_SUMMARY
+        echo "Header Files (.h): $hFiles" >> $env:GITHUB_STEP_SUMMARY
+        echo "Total Files: $($cppFiles + $hFiles)" >> $env:GITHUB_STEP_SUMMARY
+    
+    - name: Check for Common Issues
+      run: |
+        echo "### Code Quality Checks :mag:" >> $env:GITHUB_STEP_SUMMARY
+        
+        # Check for TODO comments
+        $todos = Select-String -Path srchybrid\*.cpp,srchybrid\*.h -Pattern "TODO|FIXME|HACK" -Recurse -ErrorAction SilentlyContinue
+        if ($todos) {
+          $todoCount = ($todos | Measure-Object).Count
+          echo "Found $todoCount TODO/FIXME/HACK comments" >> $env:GITHUB_STEP_SUMMARY
+        } else {
+          echo "No TODO/FIXME/HACK comments found" >> $env:GITHUB_STEP_SUMMARY
+        }
+        
+        # Check for hardcoded paths
+        $hardcodedPaths = Select-String -Path srchybrid\*.cpp -Pattern "C:\\\\|D:\\\\" -Recurse -ErrorAction SilentlyContinue
+        if ($hardcodedPaths) {
+          $pathCount = ($hardcodedPaths | Measure-Object).Count
+          echo ":warning: Found $pathCount potential hardcoded paths" >> $env:GITHUB_STEP_SUMMARY
+        }
+        
+        echo "" >> $env:GITHUB_STEP_SUMMARY
+        echo "Code quality check completed" >> $env:GITHUB_STEP_SUMMARY
+    
+  submodule-check:
+    name: Submodule Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Check Submodule Status
+      run: |
+        echo "### Git Submodules Status :link:" >> $GITHUB_STEP_SUMMARY
+        git submodule status >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Submodule Details" >> $GITHUB_STEP_SUMMARY
+        git config --file .gitmodules --get-regexp path | while read key value; do
+          name=$(echo $key | sed 's/^submodule\.\(.*\)\.path$/\1/')
+          url=$(git config --file .gitmodules --get "submodule.$name.url")
+          branch=$(git config --file .gitmodules --get "submodule.$name.branch" || echo "N/A")
+          echo "- **$name**: $url (branch: $branch)" >> $GITHUB_STEP_SUMMARY
+        done

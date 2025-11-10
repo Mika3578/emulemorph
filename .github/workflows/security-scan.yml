@@ -1,0 +1,87 @@
+name: "Security Scan"
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sundays
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH,MEDIUM'
+        exit-code: '0'
+    
+    - name: Upload Trivy results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Generate Security Report
+      run: |
+        echo "### Security Scan Results :shield:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Trivy scan completed. Check the Security tab for detailed results." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # List all C/C++ dependencies
+        echo "### Project Dependencies" >> $GITHUB_STEP_SUMMARY
+        echo "- cryptopp (Crypto++ library)" >> $GITHUB_STEP_SUMMARY
+        echo "- zlib (compression library)" >> $GITHUB_STEP_SUMMARY
+        echo "- libpng (PNG image library)" >> $GITHUB_STEP_SUMMARY
+        echo "- id3lib (ID3 tag library)" >> $GITHUB_STEP_SUMMARY
+        echo "- pupnp (Portable UPnP library)" >> $GITHUB_STEP_SUMMARY
+        echo "- pthreads (POSIX threads for Windows)" >> $GITHUB_STEP_SUMMARY
+  
+  license-check:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Check License Files
+      run: |
+        echo "### License Compliance :page_facing_up:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Find all license files
+        LICENSE_FILES=$(find . -iname "license*" -o -iname "copying*" -o -iname "licence*" | grep -v ".git" | head -20)
+        
+        if [ -n "$LICENSE_FILES" ]; then
+          echo "Found the following license files:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$LICENSE_FILES" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        else
+          echo ":warning: No license files found in the repository" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Note**: Please ensure all dependencies comply with your project's license." >> $GITHUB_STEP_SUMMARY
