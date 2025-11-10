@@ -33,8 +33,15 @@ jobs:
       with:
         languages: ${{ matrix.language }}
 
-    - name: Add MSBuild to PATH
+    - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
+
+    - name: Install ATL and MFC components
+      run: |
+        $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        $installerPath = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+        & $installerPath modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATL --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart
+      shell: powershell
 
     - name: Build with MSBuild
       run: msbuild srchybrid\emule.sln /p:Configuration=Release /p:Platform=Win32
