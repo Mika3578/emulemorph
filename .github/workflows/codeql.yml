@@ -83,15 +83,15 @@ jobs:
       uses: microsoft/setup-msbuild@v2
 
     # Install MFC and ATL components required by the project
-    - name: Install MFC and ATL components
+    - name: Install Visual Studio components (MFC, ATL)
       shell: powershell
       run: |
         # Get Visual Studio installation path
         $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
         Write-Host "Visual Studio installation path: $vsPath"
         
-        # Install MFC and ATL components
-        & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart
+        # Install MFC and ATL components separately
+        & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATL --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --wait
         
         Write-Host "MFC and ATL components installation completed"
 
