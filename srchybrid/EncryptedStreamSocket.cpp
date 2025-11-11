@@ -682,7 +682,7 @@ int CEncryptedStreamSocket::SendNegotiatingData(const void* lpBuf, uint32 nBufLe
 			AfxThrowMemoryException();
 		if (nStartCryptFromByte > 0)
 			memcpy(pBuffer, lpBuf, nStartCryptFromByte);
-		if (nBufLen - nStartCryptFromByte > 0)
+		if (nStartCryptFromByte < nBufLen)
 			RC4Crypt((uchar*)lpBuf + nStartCryptFromByte, pBuffer + nStartCryptFromByte, nBufLen - nStartCryptFromByte, m_pRC4SendKey);
 		if (m_pfiSendBuffer != NULL){
 			// we already have data pending. Attach it and try to send
