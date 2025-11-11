@@ -1,0 +1,48 @@
+name: Build eMule MorphXT
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x86
+
+      - name: Restore NuGet packages
+        run: nuget restore srchybrid\emule.sln
+
+      - name: Build Release Win32
+        run: msbuild srchybrid\emule.sln /p:Configuration=Release /p:Platform=Win32 /m
+
+      - name: Collect build output
+        shell: pwsh
+        run: |
+          $binaryDir = "srchybrid\build\Win32\Binary"
+          if (-not (Test-Path $binaryDir)) {
+            throw "Expected build output directory '$binaryDir' was not created."
+          }
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          Copy-Item -Path "$binaryDir\*" -Destination "artifacts" -Recurse -Force
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: emule-release-win32
+          path: artifacts
+
+
