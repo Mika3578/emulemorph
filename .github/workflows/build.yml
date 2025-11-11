@@ -1,0 +1,70 @@
+name: Build eMule MorphXT
+
+on:
+  push:
+    branches: [ "main", "legacy" ]
+  pull_request:
+    branches: [ "main", "legacy" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Release
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+    
+    - name: Install Visual Studio components (MFC, ATL)
+      shell: powershell
+      run: |
+        # Get Visual Studio installation path
+        $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        Write-Host "Visual Studio installation path: $vsPath"
+        
+        # Install MFC and ATL components separately with wait flag
+        & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATL --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --wait
+        
+        Write-Host "MFC and ATL components installation completed"
+    
+    - name: Build ReplaceVistaIcon utility
+      shell: cmd
+      run: |
+        echo Building ReplaceVistaIcon utility...
+        msbuild ReplaceVistaIcon\ReplaceVistaIcon.vcxproj /t:Build /p:Configuration=Release /p:Platform=Win32
+    
+    - name: Build eMule Release
+      shell: cmd
+      run: |
+        echo Building eMule solution (Release configuration)...
+        msbuild srchybrid\emule.sln /t:Rebuild /p:Configuration=Release /p:Platform=Win32 /m
+    
+    - name: Upload Release artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: eMule-MorphXT-Release
+        path: |
+          build/Win32/Binary/
+          !build/Win32/Binary/**/*.pdb
+        retention-days: 30
+    
+    - name: Build eMule Beta
+      shell: cmd
+      run: |
+        echo Building eMule solution (Beta configuration)...
+        msbuild srchybrid\emule.sln /t:Rebuild /p:Configuration=Beta /p:Platform=Win32 /m
+    
+    - name: Upload Beta artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: eMule-MorphXT-Beta
+        path: |
+          build/Win32/Binary/
+          !build/Win32/Binary/**/*.pdb
+        retention-days: 30

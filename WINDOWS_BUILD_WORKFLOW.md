@@ -2,6 +2,15 @@
 
 This document summarizes the recommended setup and daily workflow for building the eMule MorphXT client on a modern Windows 11 machine with the latest Visual Studio.
 
+## Continuous Integration
+
+The project uses GitHub Actions for automated builds. Every push and pull request triggers:
+- Automated compilation of Release and Beta configurations
+- Code quality checks via CodeQL
+- Build artifact generation
+
+View build status: [![Build Status](https://github.com/Mika3578/emulemorph/workflows/Build%20eMule%20MorphXT/badge.svg)](https://github.com/Mika3578/emulemorph/actions)
+
 ## 1. Install prerequisites
 - Install Visual Studio 2022 (or newer) with the **Desktop development with C++** workload.
 - Ensure the following individual components are added:
@@ -10,8 +19,11 @@ This document summarizes the recommended setup and daily workflow for building t
   - **MFC and ATL support for C++** (required because the project links MFC statically).
 
 ## 2. Obtain the sources
-- Clone the repository.
-- Initialize bundled submodules so that all third-party dependencies are available:
+- Clone the repository with submodules:
+  ```powershell
+  git clone --recursive https://github.com/Mika3578/emulemorph.git
+  ```
+- Or, if already cloned, initialize bundled submodules:
   ```powershell
   git submodule init
   git submodule update
@@ -41,5 +53,15 @@ This document summarizes the recommended setup and daily workflow for building t
 3. Build the `ReplaceVistaIcon` utility if Release/Beta icons are required.
 4. Build the desired configuration and inspect output under `build\Win32\Binary`.
 5. Run smoke tests under Windows 11, optionally using the debugger in Debug builds.
+6. Check CI/CD status on GitHub Actions for automated build validation.
+
+## 8. Contributing
+
+When contributing changes:
+- Ensure all configurations (Debug, Release, Beta) compile without warnings
+- Test your changes on Windows 11 (or your target platform)
+- Update documentation as needed
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines
+- CI builds will automatically verify your changes
 
 Following these steps keeps the project aligned with its existing dependencies and build expectations while leveraging the latest Visual Studio toolchain on Windows 11.
