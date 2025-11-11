@@ -1,48 +1,198 @@
-name: Build eMule MorphXT
+name: Build and Test
 
 on:
   push:
-    branches:
-      - main
+    branches: [main, master, develop]
   pull_request:
-    branches:
-      - main
+    branches: [main, master, develop]
   workflow_dispatch:
+
+env:
+  SOLUTION_FILE_PATH: srchybrid/emule.sln
+  BUILD_CONFIGURATION: Release
+  BUILD_OUTPUT_ROOT: srchybrid/build
 
 jobs:
   build:
+    strategy:
+      matrix:
+        platform: [Win32, x64]
     runs-on: windows-latest
     steps:
-      - name: Checkout repository with submodules
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v5
         with:
+          fetch-depth: 0
           submodules: recursive
 
-      - name: Install MSBuild
-        uses: microsoft/setup-msbuild@v2
-        with:
-          msbuild-architecture: x86
-
-      - name: Restore NuGet packages
-        run: nuget restore srchybrid\emule.sln
-
-      - name: Build Release Win32
-        run: msbuild srchybrid\emule.sln /p:Configuration=Release /p:Platform=Win32 /m
-
-      - name: Collect build output
+      - name: Setup MSBuild
         shell: pwsh
         run: |
-          $binaryDir = "srchybrid\build\Win32\Binary"
-          if (-not (Test-Path $binaryDir)) {
-            throw "Expected build output directory '$binaryDir' was not created."
+          # Find Visual Studio installation using vswhere (pre-installed on windows-latest)
+          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest `
+            -products * `
+            -requires Microsoft.Component.MSBuild `
+            -property installationPath
+
+          if ($vsPath) {
+            Write-Host "Found Visual Studio at: $vsPath"
+
+            # Add MSBuild to PATH
+            $msbuildPath = Join-Path $vsPath "MSBuild\Current\Bin"
+            if (Test-Path $msbuildPath) {
+              Write-Host "Adding MSBuild to PATH: $msbuildPath"
+              echo "$msbuildPath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+            }
+
+            # Add vswhere location to PATH for consistency
+            $vswherePath = "C:\Program Files (x86)\Microsoft Visual Studio\Installer"
+            echo "$vswherePath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+
+            # Persist the install path for later steps
+            echo "VS_INSTALL_PATH=$vsPath" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+          } else {
+            Write-Error "Visual Studio installation not found!"
+            exit 1
           }
-          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-          Copy-Item -Path "$binaryDir\*" -Destination "artifacts" -Recurse -Force
 
-      - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+      - name: Install MFC and ATL components
+        shell: pwsh
+        run: |
+          $vsInstallPath = $env:VS_INSTALL_PATH
+          if (-not $vsInstallPath) {
+            throw "Visual Studio install path was not exported from the setup step."
+          }
+          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+          if (-not (Test-Path $installer)) {
+            throw "Visual Studio installer not found at $installer."
+          }
+          & $installer modify `
+            --installPath $vsInstallPath `
+            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
+            --quiet --wait
+
+      - name: Restore NuGet packages
+        working-directory: ${{ github.workspace }}
+        run: nuget restore "${{ env.SOLUTION_FILE_PATH }}"
+
+      - name: Build Solution
+        working-directory: ${{ github.workspace }}
+        run: |
+          # Note: TreatWarningsAsErrors not enabled to allow gradual warning cleanup
+          $outDir = Join-Path "${{ env.BUILD_OUTPUT_ROOT }}" "${{ matrix.platform }}\${{ env.BUILD_CONFIGURATION }}\Binary\"
+          msbuild /m `
+            /p:Configuration=${{ env.BUILD_CONFIGURATION }} `
+            /p:Platform=${{ matrix.platform }} `
+            /p:OutDir="$outDir" `
+            "${{ env.SOLUTION_FILE_PATH }}"
+
+      - name: Verify Build Output
+        shell: pwsh
+        run: |
+          $exePath = Join-Path "${{ env.BUILD_OUTPUT_ROOT }}" "${{ matrix.platform }}\${{ env.BUILD_CONFIGURATION }}\Binary\emule.exe"
+          if (Test-Path $exePath) {
+            Write-Host "✓ Build successful: $exePath exists"
+            $fileInfo = Get-Item $exePath
+            Write-Host "  Size: $($fileInfo.Length) bytes"
+            Write-Host "  Modified: $($fileInfo.LastWriteTime)"
+          } else {
+            Write-Error "✗ Build failed: $exePath not found"
+            exit 1
+          }
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v5
         with:
-          name: emule-release-win32
-          path: artifacts
+          name: emule-${{ matrix.platform }}-${{ env.BUILD_CONFIGURATION }}
+          path: |
+            ${{ env.BUILD_OUTPUT_ROOT }}/${{ matrix.platform }}/${{ env.BUILD_CONFIGURATION }}/Binary/**
+          retention-days: 30
+          if-no-files-found: warn
 
+  build-debug:
+    strategy:
+      matrix:
+        platform: [Win32, x64]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          submodules: recursive
 
+      - name: Setup MSBuild
+        shell: pwsh
+        run: |
+          # Find Visual Studio installation using vswhere (pre-installed on windows-latest)
+          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest `
+            -products * `
+            -requires Microsoft.Component.MSBuild `
+            -property installationPath
+
+          if ($vsPath) {
+            Write-Host "Found Visual Studio at: $vsPath"
+
+            # Add MSBuild to PATH
+            $msbuildPath = Join-Path $vsPath "MSBuild\Current\Bin"
+            if (Test-Path $msbuildPath) {
+              Write-Host "Adding MSBuild to PATH: $msbuildPath"
+              echo "$msbuildPath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+            }
+
+            # Add vswhere location to PATH for consistency
+            $vswherePath = "C:\Program Files (x86)\Microsoft Visual Studio\Installer"
+            echo "$vswherePath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+
+            # Persist the install path for later steps
+            echo "VS_INSTALL_PATH=$vsPath" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+          } else {
+            Write-Error "Visual Studio installation not found!"
+            exit 1
+          }
+
+      - name: Install MFC and ATL components
+        shell: pwsh
+        run: |
+          $vsInstallPath = $env:VS_INSTALL_PATH
+          if (-not $vsInstallPath) {
+            throw "Visual Studio install path was not exported from the setup step."
+          }
+          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+          if (-not (Test-Path $installer)) {
+            throw "Visual Studio installer not found at $installer."
+          }
+          & $installer modify `
+            --installPath $vsInstallPath `
+            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
+            --quiet --wait
+
+      - name: Restore NuGet packages
+        working-directory: ${{ github.workspace }}
+        run: nuget restore "${{ env.SOLUTION_FILE_PATH }}"
+
+      - name: Build Debug Configuration
+        working-directory: ${{ github.workspace }}
+        run: |
+          $outDir = Join-Path "${{ env.BUILD_OUTPUT_ROOT }}" "${{ matrix.platform }}\Debug\Binary\"
+          msbuild /m `
+            /p:Configuration=Debug `
+            /p:Platform=${{ matrix.platform }} `
+            /p:OutDir="$outDir" `
+            "${{ env.SOLUTION_FILE_PATH }}"
+
+      - name: Verify Debug Build Output
+        shell: pwsh
+        run: |
+          $exePath = Join-Path "${{ env.BUILD_OUTPUT_ROOT }}" "${{ matrix.platform }}\Debug\Binary\emule.exe"
+          if (Test-Path $exePath) {
+            Write-Host "✓ Debug build successful: $exePath exists"
+            $fileInfo = Get-Item $exePath
+            Write-Host "  Size: $($fileInfo.Length) bytes"
+            Write-Host "  Modified: $($fileInfo.LastWriteTime)"
+          } else {
+            Write-Error "✗ Debug build failed: $exePath not found"
+            exit 1
+          }

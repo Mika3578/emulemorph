@@ -1,0 +1,170 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+env:
+  SOLUTION_FILE_PATH: srchybrid/emule.sln
+
+jobs:
+  static-analysis:
+    name: Static Analysis
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup MSBuild
+        shell: pwsh
+        run: |
+          # Locate the latest Visual Studio installation that includes MSBuild.
+          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest `
+            -products * `
+            -requires Microsoft.Component.MSBuild `
+            -property installationPath
+
+          if ($vsPath) {
+            Write-Host "Found Visual Studio at: $vsPath"
+
+            # Add MSBuild to PATH for subsequent steps.
+            $msbuildPath = Join-Path $vsPath "MSBuild\Current\Bin"
+            if (Test-Path $msbuildPath) {
+              Write-Host "Adding MSBuild to PATH: $msbuildPath"
+              echo "$msbuildPath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+            }
+
+            # Persist installer paths for later steps.
+            $vswherePath = "C:\Program Files (x86)\Microsoft Visual Studio\Installer"
+            echo "$vswherePath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+            echo "VS_INSTALL_PATH=$vsPath" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+          } else {
+            Write-Error "Visual Studio installation not found!"
+            exit 1
+          }
+
+      - name: Install MFC and ATL components
+        shell: pwsh
+        run: |
+          $vsInstallPath = $env:VS_INSTALL_PATH
+          if (-not $vsInstallPath) {
+            throw "Visual Studio install path was not exported from the setup step."
+          }
+          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+          if (-not (Test-Path $installer)) {
+            throw "Visual Studio installer not found at $installer."
+          }
+          & $installer modify `
+            --installPath $vsInstallPath `
+            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
+            --quiet --wait
+
+      - name: Restore NuGet packages
+        run: nuget restore "${{ env.SOLUTION_FILE_PATH }}"
+
+      - name: Run Code Analysis
+        shell: pwsh
+        run: |
+          $outDir = Join-Path "srchybrid/build" "Win32/Release/CodeAnalysis/"
+          msbuild /m `
+            /p:Configuration=Release `
+            /p:Platform=Win32 `
+            /p:RunCodeAnalysis=true `
+            /p:CodeAnalysisRuleSet=NativeRecommendedRules.ruleset `
+            /p:OutDir="$outDir" `
+            "${{ env.SOLUTION_FILE_PATH }}"
+        continue-on-error: true
+
+      - name: Upload Analysis Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: code-analysis-results
+          path: |
+            **/*.nativecodeanalysis.xml
+          retention-days: 7
+
+  lint-check:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Check formatting (dry-run)
+        run: |
+          find srchybrid -type f \( -name "*.cpp" -o -name "*.h" \) | while read -r file; do
+            clang-format --dry-run --Werror "$file" 2>&1 | tee -a format-errors.txt || true
+          done
+        continue-on-error: true
+
+      - name: Show formatting issues
+        if: always()
+        run: |
+          if [ -f format-errors.txt ]; then
+            echo "Formatting issues found:"
+            cat format-errors.txt
+          else
+            echo "No formatting issues found"
+          fi
+
+  documentation-check:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Check for README updates
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+
+          if [ -z "$BASE" ]; then
+            echo "::notice::Unable to determine base revision for README comparison."
+          else
+            git fetch origin "$BASE" --depth=1 || true
+            CHANGED=$(git diff --name-only "$BASE" "$HEAD" || true)
+            if ! echo "$CHANGED" | grep -qi "readme.md"; then
+              echo "::notice::No README updates in this change."
+            fi
+          fi
+
+      - name: Check for broken links in markdown
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'no'
+        continue-on-error: true
+
+  dependency-check:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+        continue-on-error: true
+

@@ -1,0 +1,182 @@
+name: Release Build
+
+on:
+  release:
+    types: [created, published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0.0)'
+        required: true
+        default: '1.0.0.0'
+
+env:
+  SOLUTION_FILE_PATH: srchybrid/emule.sln
+  BUILD_OUTPUT_ROOT: srchybrid/build
+
+jobs:
+  build-release:
+    name: Build Release (${{ matrix.platform }})
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        platform: [Win32, x64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup MSBuild
+        shell: pwsh
+        run: |
+          # Locate the latest Visual Studio installation that includes MSBuild.
+          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest `
+            -products * `
+            -requires Microsoft.Component.MSBuild `
+            -property installationPath
+
+          if ($vsPath) {
+            Write-Host "Found Visual Studio at: $vsPath"
+
+            # Add MSBuild to PATH for subsequent steps.
+            $msbuildPath = Join-Path $vsPath "MSBuild\Current\Bin"
+            if (Test-Path $msbuildPath) {
+              Write-Host "Adding MSBuild to PATH: $msbuildPath"
+              echo "$msbuildPath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+            }
+
+            # Persist installer paths for later steps.
+            $vswherePath = "C:\Program Files (x86)\Microsoft Visual Studio\Installer"
+            echo "$vswherePath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+            echo "VS_INSTALL_PATH=$vsPath" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+          } else {
+            Write-Error "Visual Studio installation not found!"
+            exit 1
+          }
+
+      - name: Install MFC and ATL components
+        shell: pwsh
+        run: |
+          $vsInstallPath = $env:VS_INSTALL_PATH
+          if (-not $vsInstallPath) {
+            throw "Visual Studio install path was not exported from the setup step."
+          }
+          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+          if (-not (Test-Path $installer)) {
+            throw "Visual Studio installer not found at $installer."
+          }
+          & $installer modify `
+            --installPath $vsInstallPath `
+            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
+            --quiet --wait
+
+      - name: Restore NuGet packages
+        run: nuget restore "${{ env.SOLUTION_FILE_PATH }}"
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          $outDir = Join-Path "${{ env.BUILD_OUTPUT_ROOT }}" "${{ matrix.platform }}\Release\Binary\"
+          msbuild /m `
+            /p:Configuration=Release `
+            /p:Platform=${{ matrix.platform }} `
+            /p:OutDir="$outDir" `
+            "${{ env.SOLUTION_FILE_PATH }}"
+
+      - name: Verify Release Binaries
+        shell: pwsh
+        run: |
+          $exePath = Join-Path "${{ env.BUILD_OUTPUT_ROOT }}" "${{ matrix.platform }}\Release\Binary\emule.exe"
+          if (Test-Path $exePath) {
+            Write-Host "✓ Release build successful: $exePath"
+            $info = Get-Item $exePath
+            Write-Host "  Size: $($info.Length) bytes"
+            Write-Host "  Modified: $($info.LastWriteTime)"
+          } else {
+            Write-Error "✗ Release build failed: $exePath not found"
+            exit 1
+          }
+
+      - name: Package Release
+        shell: pwsh
+        run: |
+          $artifactRoot = "emule-${{ matrix.platform }}-release"
+          $binarySource = Join-Path "${{ env.BUILD_OUTPUT_ROOT }}" "${{ matrix.platform }}\Release\Binary"
+          New-Item -ItemType Directory -Force -Path $artifactRoot | Out-Null
+          Copy-Item -Path (Join-Path $binarySource "*") -Destination (Join-Path $artifactRoot "Binary") -Recurse -Force
+          Copy-Item -Path "srchybrid\lang" -Destination (Join-Path $artifactRoot "lang") -Recurse -ErrorAction SilentlyContinue
+          Copy-Item -Path "emule\config" -Destination (Join-Path $artifactRoot "config") -Recurse -ErrorAction SilentlyContinue
+          Copy-Item -Path "emule\webserver" -Destination (Join-Path $artifactRoot "webserver") -Recurse -ErrorAction SilentlyContinue
+          Copy-Item -Path "emule\wapserver" -Destination (Join-Path $artifactRoot "wapserver") -Recurse -ErrorAction SilentlyContinue
+          Copy-Item -Path "Readme.md" -Destination $artifactRoot -ErrorAction SilentlyContinue
+          Copy-Item -Path "emule\license.txt" -Destination $artifactRoot -ErrorAction SilentlyContinue
+          $version = if ("${{ github.event.inputs.version }}") { "${{ github.event.inputs.version }}" } else { "${{ github.ref_name }}" }
+          @"
+eMule MorphXT
+Version: $version
+Platform: ${{ matrix.platform }}
+Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+Commit: ${{ github.sha }}
+"@ | Out-File -FilePath (Join-Path $artifactRoot "VERSION.txt") -Encoding utf8
+
+      - name: Create ZIP archive
+        shell: pwsh
+        run: |
+          $version = if ("${{ github.event.inputs.version }}") { "${{ github.event.inputs.version }}" } else { "${{ github.ref_name }}" }
+          $zipName = "emule-${{ matrix.platform }}-$version.zip"
+          Compress-Archive -Path "emule-${{ matrix.platform }}-release\*" -DestinationPath $zipName -Force
+
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: emule-${{ matrix.platform }}-release
+          path: emule-${{ matrix.platform }}-*.zip
+          retention-days: 90
+
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: emule-${{ matrix.platform }}-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-installer:
+    name: Create Installer
+    needs: build-release
+    runs-on: windows-latest
+    if: github.event_name == 'release'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download Win32 artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: emule-Win32-release
+          path: ./artifacts/Win32
+
+      - name: Download x64 artifacts
+        uses: actions/download-artifact@v6
+        with:
+          name: emule-x64-release
+          path: ./artifacts/x64
+
+      - name: Create installer
+        shell: pwsh
+        run: |
+          # Placeholder for installer creation using a tool such as NSIS, WiX, or InnoSetup.
+          Write-Host "Installer creation step is not yet implemented."
+
+      - name: Upload Installer
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            emule-installer-*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -1,0 +1,35 @@
+name: "CodeQL Config for eMule MorphXT"
+
+# Paths to include in analysis
+paths:
+  - srchybrid
+  - cryptopp
+  - ResizableLib
+  - ReplaceVistaIcon
+
+# Paths to exclude from analysis
+paths-ignore:
+  - "**/build/**"
+  - "**/Debug*/**"
+  - "**/Release*/**"
+  - "**/obj/**"
+  - "**/out/**"
+  - "**/external/**"
+  - "srchybrid/lang"
+  - "srchybrid/res"
+
+# Disable default queries to use custom ones
+disable-default-queries: false
+
+# Additional queries to run
+queries:
+  - uses: security-and-quality
+  - uses: security-extended
+
+# Query filters
+query-filters:
+  - exclude:
+      id: cpp/poorly-documented-function
+  - exclude:
+      id: cpp/fixme-comment
+

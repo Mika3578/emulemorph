@@ -1,0 +1,103 @@
+name: "CodeQL Security Scan"
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+env:
+  SOLUTION_FILE_PATH: srchybrid/emule.sln
+
+jobs:
+  analyze:
+    name: Analyze C++
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: cpp
+          config-file: ./.github/codeql/codeql-config.yml
+          queries: +security-and-quality
+
+      - name: Setup MSBuild
+        shell: pwsh
+        run: |
+          # Locate the latest Visual Studio installation that includes MSBuild.
+          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest `
+            -products * `
+            -requires Microsoft.Component.MSBuild `
+            -property installationPath
+
+          if ($vsPath) {
+            Write-Host "Found Visual Studio at: $vsPath"
+
+            # Add MSBuild to PATH for subsequent steps.
+            $msbuildPath = Join-Path $vsPath "MSBuild\Current\Bin"
+            if (Test-Path $msbuildPath) {
+              Write-Host "Adding MSBuild to PATH: $msbuildPath"
+              echo "$msbuildPath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+            }
+
+            # Persist installer paths for later steps.
+            $vswherePath = "C:\Program Files (x86)\Microsoft Visual Studio\Installer"
+            echo "$vswherePath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+            echo "VS_INSTALL_PATH=$vsPath" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+          } else {
+            Write-Error "Visual Studio installation not found!"
+            exit 1
+          }
+
+      - name: Install MFC and ATL components
+        shell: pwsh
+        run: |
+          $vsInstallPath = $env:VS_INSTALL_PATH
+          if (-not $vsInstallPath) {
+            throw "Visual Studio install path was not exported from the setup step."
+          }
+          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
+          if (-not (Test-Path $installer)) {
+            throw "Visual Studio installer not found at $installer."
+          }
+          & $installer modify `
+            --installPath $vsInstallPath `
+            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
+            --quiet --wait
+
+      - name: Restore NuGet packages
+        run: nuget restore "${{ env.SOLUTION_FILE_PATH }}"
+
+      - name: Build with MSBuild
+        shell: pwsh
+        run: |
+          $outDir = Join-Path "srchybrid/build" "Win32/Release/CodeQL/"
+          msbuild /m `
+            /p:Configuration=Release `
+            /p:Platform=Win32 `
+            /p:OutDir="$outDir" `
+            "${{ env.SOLUTION_FILE_PATH }}"
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:cpp"
+
