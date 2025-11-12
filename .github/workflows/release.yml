@@ -171,12 +171,5 @@ Commit: ${{ github.sha }}
           # Placeholder for installer creation using a tool such as NSIS, WiX, or InnoSetup.
           Write-Host "Installer creation step is not yet implemented."
 
-      - name: Upload Installer
-        if: success()
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            emule-installer-*.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+# The "Upload Installer" step has been removed until installer creation is implemented.
 
