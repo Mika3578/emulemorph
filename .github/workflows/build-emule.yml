@@ -84,6 +84,7 @@ jobs:
         run: nuget restore "${{ env.SOLUTION_FILE_PATH }}"
 
       - name: Build Solution
+        shell: pwsh
         run: |
           # Note: TreatWarningsAsErrors not enabled to allow gradual warning cleanup
           $outDir = Join-Path "${{ env.BUILD_OUTPUT_ROOT }}" "${{ matrix.platform }}\${{ env.BUILD_CONFIGURATION }}\Binary\"
@@ -189,6 +190,7 @@ jobs:
 
       - name: Build Debug Configuration
         working-directory: ${{ github.workspace }}
+        shell: pwsh
         run: |
           $outDir = Join-Path "${{ env.BUILD_OUTPUT_ROOT }}" "${{ matrix.platform }}\Debug\Binary\"
           msbuild /m `
