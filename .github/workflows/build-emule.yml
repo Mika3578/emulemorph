@@ -108,7 +108,7 @@ jobs:
           }
 
       - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: emule-${{ matrix.platform }}-${{ env.BUILD_CONFIGURATION }}
           path: |
