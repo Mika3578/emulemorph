@@ -15,7 +15,7 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@cfd5d913b3d6c3b4b7a0c3e8bfa6e2c1e2c3b2e3
       with:
         submodules: recursive
         
