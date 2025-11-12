@@ -20,7 +20,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        platform: [Win32, x64]
+        platform: [Win32]
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -158,12 +158,6 @@ Commit: ${{ github.sha }}
         with:
           name: emule-Win32-release
           path: ./artifacts/Win32
-
-      - name: Download x64 artifacts
-        uses: actions/download-artifact@v6
-        with:
-          name: emule-x64-release
-          path: ./artifacts/x64
 
       - name: Create installer
         shell: pwsh

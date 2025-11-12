@@ -16,7 +16,7 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [Win32, x64]
+        platform: [Win32]
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -113,7 +113,7 @@ jobs:
   build-debug:
     strategy:
       matrix:
-        platform: [Win32, x64]
+        platform: [Win32]
     runs-on: windows-latest
     steps:
       - name: Checkout code
