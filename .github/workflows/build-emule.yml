@@ -16,7 +16,7 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [Win32, x64]
+        platform: [Win32]
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -81,11 +81,9 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Restore NuGet packages
-        working-directory: ${{ github.workspace }}
         run: nuget restore "${{ env.SOLUTION_FILE_PATH }}"
 
       - name: Build Solution
-        working-directory: ${{ github.workspace }}
         run: |
           # Note: TreatWarningsAsErrors not enabled to allow gradual warning cleanup
           $outDir = Join-Path "${{ env.BUILD_OUTPUT_ROOT }}" "${{ matrix.platform }}\${{ env.BUILD_CONFIGURATION }}\Binary\"
