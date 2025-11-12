@@ -25,53 +25,8 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Setup MSBuild
-        shell: pwsh
-        run: |
-          # Find Visual Studio installation using vswhere (pre-installed on windows-latest)
-          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" `
-            -latest `
-            -products * `
-            -requires Microsoft.Component.MSBuild `
-            -property installationPath
-
-          if ($vsPath) {
-            Write-Host "Found Visual Studio at: $vsPath"
-
-            # Add MSBuild to PATH
-            $msbuildPath = Join-Path $vsPath "MSBuild\Current\Bin"
-            if (Test-Path $msbuildPath) {
-              Write-Host "Adding MSBuild to PATH: $msbuildPath"
-              echo "$msbuildPath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
-            }
-
-            # Add vswhere location to PATH for consistency
-            $vswherePath = "C:\Program Files (x86)\Microsoft Visual Studio\Installer"
-            echo "$vswherePath" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
-
-            # Persist the install path for later steps
-            echo "VS_INSTALL_PATH=$vsPath" | Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
-          } else {
-            Write-Error "Visual Studio installation not found!"
-            exit 1
-          }
-
-      - name: Install MFC and ATL components
-        shell: pwsh
-        run: |
-          $vsInstallPath = $env:VS_INSTALL_PATH
-          if (-not $vsInstallPath) {
-            throw "Visual Studio install path was not exported from the setup step."
-          }
-          $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
-          if (-not (Test-Path $installer)) {
-            throw "Visual Studio installer not found at $installer."
-          }
-          & $installer modify `
-            --installPath $vsInstallPath `
-            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
-            --quiet --wait
-
+      - name: Setup MSBuild and Install MFC/ATL
+        uses: ./.github/actions/setup-msbuild-mfc
       - name: Cache NuGet packages
         uses: actions/cache@v4
         with:
