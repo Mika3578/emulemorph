@@ -38,7 +38,7 @@ jobs:
     - name: Upload Release artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: emule-release-build
+        name: emule-release-build-${{ github.run_number }}
         path: |
           srchybrid/Release/*.exe
           srchybrid/Release/*.dll
