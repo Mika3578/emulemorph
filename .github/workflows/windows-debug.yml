@@ -33,7 +33,7 @@ jobs:
     - name: Upload Debug artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: emule-debug-build
+        name: emule-debug-build-${{ github.run_number }}
         path: |
           srchybrid/Debug/*.exe
           srchybrid/Debug/*.dll
