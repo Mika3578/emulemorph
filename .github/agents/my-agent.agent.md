@@ -33,7 +33,7 @@ To build the project locally:
 
 1. Clone the repository with submodules:
    ```bash
-   git clone --recursive https://github.com/Mika3578/emulemorph.git
+   git clone --recursive [repository-url]
    ```
 
 2. Initialize submodules (if not cloned recursively):
