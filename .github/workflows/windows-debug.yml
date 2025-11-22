@@ -1,0 +1,41 @@
+name: Windows Debug Build
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Restore NuGet packages
+      working-directory: ${{github.workspace}}/srchybrid
+      run: nuget restore emule.sln
+      
+    - name: Build Debug
+      working-directory: ${{github.workspace}}/srchybrid
+      run: msbuild emule.sln /p:Configuration=Debug /p:Platform=Win32 /m /v:minimal
+      
+    - name: Upload Debug artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: emule-debug-build-${{ github.run_number }}
+        path: |
+          srchybrid/Debug/*.exe
+          srchybrid/Debug/*.dll
+          srchybrid/Debug/*.pdb
+        if-no-files-found: warn
