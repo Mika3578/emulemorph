@@ -1,4 +1,6 @@
 name: Comprehensive CI
+permissions:
+  contents: read
 
 on:
   push:
