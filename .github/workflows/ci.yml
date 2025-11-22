@@ -1,60 +1,50 @@
-name: Comprehensive CI
-permissions:
-  contents: read
+name: CI
 
 on:
   push:
-    branches: [ main, master, develop ]
-    tags:
-      - 'v*'
+    branches: ["**"]
   pull_request:
-    branches: [ main, master, develop ]
-  workflow_dispatch:
 
 jobs:
   build-windows:
-    name: Build (${{ matrix.configuration }})
+    name: Windows build (${{ matrix.configuration }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        configuration: [ Debug, Release, Beta ]
-    env:
-      SOLUTION_FILE: srchybrid/emule.sln
-      BUILD_PLATFORM: Win32
+        configuration: [Debug, Release]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          fetch-depth: 0
 
-      - name: Set up MSBuild
+      - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.config') }}
-          restore-keys: ${{ runner.os }}-nuget-
+      - name: Install Windows 10 SDK 10.0.22621.0
+        shell: pwsh
+        run: choco install windows-sdk-10-version-22621-all --yes --no-progress
 
-      - name: Restore NuGet packages
-        working-directory: ${{ github.workspace }}/srchybrid
-        run: nuget restore emule.sln
+      - name: Install MFC components
+        shell: pwsh
+        run: |
+          $vsWhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
 
-      - name: Build ${{ matrix.configuration }} configuration
-        working-directory: ${{ github.workspace }}/srchybrid
-        run: msbuild emule.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ env.BUILD_PLATFORM }} /m /v:minimal
+          $vsPath = & $vsWhere -latest -prerelease -products * -property installationPath
+          if (-not $vsPath) {
+            throw 'Unable to locate a Visual Studio installation on the runner.'
+          }
 
-      - name: Upload ${{ matrix.configuration }} artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: emule-${{ matrix.configuration }}-${{ github.run_number }}
-          path: |
-            srchybrid/${{ matrix.configuration }}/*.exe
-            srchybrid/${{ matrix.configuration }}/*.dll
-            srchybrid/${{ matrix.configuration }}/*.pdb
-          if-no-files-found: warn
+          $hasMfc = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.ATLMFC -property installationPath
+          if ($hasMfc) {
+            Write-Host "MFC component already installed for Visual Studio at $hasMfc."
+            return
+          }
+
+          &"$vsPath\Common7\IDE\vs_installer.exe" modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart --nocache
+
+      - name: Build solution
+        working-directory: ${{ github.workspace }}\srchybrid
+        run: msbuild emule.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=Win32 /m
