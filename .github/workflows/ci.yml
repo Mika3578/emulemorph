@@ -8,11 +8,31 @@ on:
 jobs:
   build-windows:
     name: Windows build (${{ matrix.configuration }})
+name: Comprehensive CI
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build (${{ matrix.configuration }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
         configuration: [Debug, Release]
+        configuration: [ Debug, Release, Beta ]
+    env:
+      SOLUTION_FILE: srchybrid/emule.sln
+      BUILD_PLATFORM: Win32
 
     steps:
       - name: Checkout repository
@@ -32,3 +52,33 @@ jobs:
 
       - name: Build solution
         run: msbuild srchybrid\\emule.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=Win32 /m
+          fetch-depth: 0
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.config') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore NuGet packages
+        working-directory: ${{ github.workspace }}/srchybrid
+        run: nuget restore emule.sln
+
+      - name: Build ${{ matrix.configuration }} configuration
+        working-directory: ${{ github.workspace }}/srchybrid
+        run: msbuild emule.sln /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ env.BUILD_PLATFORM }} /m /v:minimal
+
+      - name: Upload ${{ matrix.configuration }} artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: emule-${{ matrix.configuration }}-${{ github.run_number }}
+          path: |
+            srchybrid/${{ matrix.configuration }}/*.exe
+            srchybrid/${{ matrix.configuration }}/*.dll
+            srchybrid/${{ matrix.configuration }}/*.pdb
+          if-no-files-found: warn
