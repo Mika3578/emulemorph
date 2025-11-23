@@ -43,7 +43,12 @@ jobs:
             return
           }
 
-          &"$vsPath\Common7\IDE\vs_installer.exe" modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart --nocache
+          $installerPath = "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vs_installer.exe"
+          if (-not (Test-Path $installerPath)) {
+            throw "Visual Studio installer not found at expected path: $installerPath"
+          }
+
+          &"$installerPath" modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart --nocache
 
       - name: Build solution
         working-directory: ${{ github.workspace }}\srchybrid
